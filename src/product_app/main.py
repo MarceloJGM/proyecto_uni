@@ -8,7 +8,7 @@ def add_product():
     product_price = price.get()
     if product_name and product_price:
         with open(
-            "/home/marcelojgm/Documentos/Python/Projects/Product-app/src/product_app/products.csv",
+            "./products.csv",
             "a",
             newline="",
             encoding="utf-8",
@@ -19,19 +19,27 @@ def add_product():
     price.delete(0, tk.END)
     get_products()
 
-
-def get_products():
+def get_products(name=None):
     for i in tree.get_children():
         tree.delete(i)
     with open(
-        "/home/marcelojgm/Documentos/Python/Projects/Product-app/src/product_app/products.csv",
+        "./products.csv",
         "r",
         encoding="utf-8",
     ) as file:
         lector_csv = csv.DictReader(file)
         for product in lector_csv:
-            tree.insert("", 0, values=(product["nombre_producto"], product["precio"]))
+            if name:
+                if product["nombre_producto"].lower().startswith(name):
+                    tree.insert("", 0, values=(product["nombre_producto"], product["precio"]))
+            else:
+                tree.insert("", 0, values=(product["nombre_producto"], product["precio"]))
 
+
+
+def search_products():
+    search_text = search_entry.get().lower()
+    get_products(search_text)
 
 window = tk.Tk()
 window.title("Registro de Productos")
@@ -78,6 +86,15 @@ button = tk.Button(
     bd=0,
 )
 button.pack()
+
+search_frame = tk.Frame(window, bg="#111")
+search_frame.pack(pady=(0, 30))
+
+search_entry = tk.Entry(search_frame)
+search_entry.pack(side="left", padx=5)
+
+search_button = tk.Button(search_frame, text="Buscar", height=0, command=search_products)
+search_button.pack(side='right')
 
 tree = ttk.Treeview(window, columns=("name", "price"), show="headings")
 tree.pack()
