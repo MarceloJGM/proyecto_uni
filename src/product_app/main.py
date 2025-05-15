@@ -1,4 +1,5 @@
 import tkinter as tk
+import re
 from tkinter import BOTH, ttk, messagebox
 import csv
 from tempfile import NamedTemporaryFile
@@ -18,7 +19,10 @@ def init_csv():
 def add_product():
     product_name = name.get()
     product_price = price.get()
-    if product_name and product_price:
+    regex_product = r"^[a-zA]+$"
+    regex_price = r"^[Z0-9]+$"
+    if product_name and product_price and (
+        bool(re.fullmatch(regex_product, product_name)) and bool(re.fullmatch(regex_price, product_price))):
         with open("./products.csv", "a", newline="", encoding="utf-8") as file:
             escritor_csv = csv.writer(file)
             escritor_csv.writerow([product_name, product_price])
@@ -53,6 +57,7 @@ def get_products(name=None):
                         iid=idx,
                         values=(product["nombre_producto"], product["precio"]),
                     )
+
     except FileNotFoundError:
         pass
 
@@ -64,11 +69,6 @@ def search_products():
 
 def delete_product():
     selected_item = tree.selection()
-    if not selected_item:
-        messagebox.showwarning(
-            "Advertencia", "Por favor seleccione un producto para eliminar"
-        )
-        return
 
     tempfile = NamedTemporaryFile(mode="w", delete=False, newline="", encoding="utf-8")
 
@@ -87,11 +87,6 @@ def delete_product():
 
 def start_edit():
     selected_item = tree.selection()
-    if not selected_item:
-        messagebox.showwarning(
-            "Advertencia", "Por favor seleccione un producto para editar"
-        )
-        return
 
     if len(selected_item) > 1:
         messagebox.showwarning(
@@ -106,6 +101,8 @@ def start_edit():
     price.insert(0, item_data[1])
 
     add_button.config(state=tk.DISABLED)
+    delete_button.config(state=tk.DISABLED)
+    search_button.config(state=tk.DISABLED)
     edit_button.config(state=tk.NORMAL)
     start_edit_button.config(state=tk.DISABLED)
 
@@ -143,6 +140,7 @@ def save_edit():
     price.delete(0, tk.END)
     add_button.config(state=tk.NORMAL)
     edit_button.config(state=tk.DISABLED)
+    search_button.config(state=tk.NORMAL)
     start_edit_button.config(state=tk.NORMAL)
     editing_item = None
     get_products()
@@ -207,6 +205,7 @@ start_edit_button = tk.Button(
     bg="#FFA500",
     fg="#111",
     bd=0,
+    state=tk.DISABLED
 )
 start_edit_button.pack(side=tk.LEFT, padx=5)
 
@@ -240,6 +239,7 @@ delete_button = tk.Button(
     bg="#F44336",
     fg="#111",
     bd=0,
+    state=tk.DISABLED
 )
 delete_button.pack(side=tk.LEFT, padx=5)
 
@@ -250,12 +250,30 @@ tree.pack(fill=BOTH, expand=True, padx=20, pady=(0, 20))
 tree.heading("name", text="Nombre", anchor="center")
 tree.heading("price", text="Precio", anchor="center")
 
+style = ttk.Style()
+style.theme_use("default")
+style.configure("Treeview",
+    background="#333",
+    foreground="#f8f8ff",
+    fieldbackground="#333",
+    bordercolor="#444",
+    borderwidth=1)
+# style.map("Treeview",
+#     background=[("selected", "#4CAF50")],
+#     foreground=[("selected", "#111")])
+style.configure("Treeview.Heading",
+    background="#222",
+    foreground="#f8f8ff",
+    font=("Verdana", 10, "bold"),
+    relief="groove")
 
 def on_tree_select(event):
     selected = tree.selection()
     if selected:
+        delete_button.config(state=tk.NORMAL)
         start_edit_button.config(state=tk.NORMAL)
     else:
+        delete_button.config(state=tk.DISABLED)
         start_edit_button.config(state=tk.DISABLED)
 
 
