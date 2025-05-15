@@ -6,6 +6,9 @@ from tempfile import NamedTemporaryFile
 import shutil
 
 
+regex_product = r"^[a-zA-Z]+$"
+regex_price = r"^[0-9]+$"
+
 def init_csv():
     try:
         with open("./products.csv", "r", encoding="utf-8") as file:
@@ -19,8 +22,6 @@ def init_csv():
 def add_product():
     product_name = name.get()
     product_price = price.get()
-    regex_product = r"^[a-zA]+$"
-    regex_price = r"^[Z0-9]+$"
     if product_name and product_price and (
         bool(re.fullmatch(regex_product, product_name)) and bool(re.fullmatch(regex_price, product_price))):
         with open("./products.csv", "a", newline="", encoding="utf-8") as file:
@@ -42,15 +43,14 @@ def get_products(name=None):
         with open("./products.csv", "r", encoding="utf-8") as file:
             lector_csv = csv.DictReader(file)
             for idx, product in enumerate(lector_csv):
-                if name:
-                    if product["nombre_producto"].lower().startswith(name.lower()):
-                        tree.insert(
-                            "",
-                            tk.END,
-                            iid=idx,
-                            values=(product["nombre_producto"], product["precio"]),
-                        )
-                else:
+                if name and product["nombre_producto"].lower().startswith(name.lower()):
+                    tree.insert(
+                        "",
+                        tk.END,
+                        iid=idx,
+                        values=(product["nombre_producto"], product["precio"]),
+                    )
+                elif not name:
                     tree.insert(
                         "",
                         tk.END,
@@ -115,26 +115,28 @@ def save_edit():
     new_name = name.get()
     new_price = price.get()
 
-    if not new_name or not new_price:
+    if new_name and new_price and (
+        bool(re.fullmatch(regex_product, new_name)) and bool(re.fullmatch(regex_price, new_price))):
+        tempfile = NamedTemporaryFile(mode="w", delete=False, newline="", encoding="utf-8")
+
+        with open("./products.csv", "r", encoding="utf-8") as csvfile, tempfile:
+            reader = csv.DictReader(csvfile)
+            writer = csv.DictWriter(tempfile, fieldnames=["nombre_producto", "precio"])
+            writer.writeheader()
+
+            for idx, row in enumerate(reader):
+                if str(idx) == editing_item:
+                    writer.writerow({"nombre_producto": new_name, "precio": new_price})
+                else:
+                    writer.writerow(row)
+
+        shutil.move(tempfile.name, "./products.csv")
+    else:
         messagebox.showwarning(
             "Advertencia", "Por favor ingrese nombre y precio del producto"
         )
         return
 
-    tempfile = NamedTemporaryFile(mode="w", delete=False, newline="", encoding="utf-8")
-
-    with open("./products.csv", "r", encoding="utf-8") as csvfile, tempfile:
-        reader = csv.DictReader(csvfile)
-        writer = csv.DictWriter(tempfile, fieldnames=["nombre_producto", "precio"])
-        writer.writeheader()
-
-        for idx, row in enumerate(reader):
-            if str(idx) == editing_item:
-                writer.writerow({"nombre_producto": new_name, "precio": new_price})
-            else:
-                writer.writerow(row)
-
-    shutil.move(tempfile.name, "./products.csv")
 
     name.delete(0, tk.END)
     price.delete(0, tk.END)
@@ -258,9 +260,7 @@ style.configure("Treeview",
     fieldbackground="#333",
     bordercolor="#444",
     borderwidth=1)
-# style.map("Treeview",
-#     background=[("selected", "#4CAF50")],
-#     foreground=[("selected", "#111")])
+
 style.configure("Treeview.Heading",
     background="#222",
     foreground="#f8f8ff",
