@@ -5,9 +5,16 @@ import csv
 from tempfile import NamedTemporaryFile
 import shutil
 
-
-regex_product = r"^[a-zA-Z]+$"
+regex_product = r"^[a-zA-Z]+(?: [a-zA-Z]+)*$"
 regex_price = r"^[0-9]+$"
+
+class Producto:
+    def __init__(self, nombre_producto, precio):
+        self.nombre_producto = nombre_producto
+        self.precio = precio
+
+    def __str__(self):
+        return f"Nombre: {self.nombre_producto}, Precio: {self.precio}"
 
 def init_csv():
     try:
@@ -18,15 +25,13 @@ def init_csv():
             writer = csv.writer(file)
             writer.writerow(["nombre_producto", "precio"])
 
-
 def add_product():
     product_name = name.get()
     product_price = price.get()
     if product_name and product_price and (
         bool(re.fullmatch(regex_product, product_name)) and bool(re.fullmatch(regex_price, product_price))):
-        with open("./products.csv", "a", newline="", encoding="utf-8") as file:
-            escritor_csv = csv.writer(file)
-            escritor_csv.writerow([product_name, product_price])
+        producto = Producto(product_name, product_price)
+        _save_product(producto)
         name.delete(0, tk.END)
         price.delete(0, tk.END)
         get_products()
@@ -35,6 +40,10 @@ def add_product():
             "Advertencia", "Por favor ingrese nombre y precio del producto"
         )
 
+def _save_product(producto):
+    with open("./products.csv", "a", newline="", encoding="utf-8") as file:
+        writer = csv.writer(file)
+        writer.writerow([producto.nombre_producto, producto.precio])
 
 def get_products(name=None):
     for i in tree.get_children():
@@ -42,111 +51,103 @@ def get_products(name=None):
     try:
         with open("./products.csv", "r", encoding="utf-8") as file:
             lector_csv = csv.DictReader(file)
-            for idx, product in enumerate(lector_csv):
-                if name and product["nombre_producto"].lower().startswith(name.lower()):
-                    tree.insert(
-                        "",
-                        tk.END,
-                        iid=idx,
-                        values=(product["nombre_producto"], product["precio"]),
-                    )
+            for idx, row in enumerate(lector_csv):
+                producto = Producto(row["nombre_producto"], row["precio"])
+                if name and producto.nombre_producto.lower().startswith(name.lower()):
+                    _insert_product_to_tree(producto, idx)
                 elif not name:
-                    tree.insert(
-                        "",
-                        tk.END,
-                        iid=idx,
-                        values=(product["nombre_producto"], product["precio"]),
-                    )
-
+                    _insert_product_to_tree(producto, idx)
     except FileNotFoundError:
         pass
 
+def _insert_product_to_tree(producto, index):
+    tree.insert(
+        "",
+        tk.END,
+        iid=index,
+        values=(producto.nombre_producto, producto.precio),
+    )
 
 def search_products():
     search_text = search_entry.get()
     get_products(search_text)
 
+def see_all_products():
+    get_products("")
+    search_entry.delete(0, tk.END)
 
 def delete_product():
     selected_item = tree.selection()
+    _delete_products_from_csv(selected_item)
+    get_products()
 
+def _delete_products_from_csv(indices_a_eliminar):
     tempfile = NamedTemporaryFile(mode="w", delete=False, newline="", encoding="utf-8")
-
     with open("./products.csv", "r", encoding="utf-8") as csvfile, tempfile:
         reader = csv.DictReader(csvfile)
         writer = csv.DictWriter(tempfile, fieldnames=["nombre_producto", "precio"])
         writer.writeheader()
-
         for idx, row in enumerate(reader):
-            if str(idx) not in selected_item:
+            if str(idx) not in indices_a_eliminar:
                 writer.writerow(row)
-
     shutil.move(tempfile.name, "./products.csv")
-    get_products()
-
 
 def start_edit():
     selected_item = tree.selection()
-
     if len(selected_item) > 1:
         messagebox.showwarning(
             "Advertencia", "Por favor seleccione solo un producto para editar"
         )
         return
-
     item_data = tree.item(selected_item[0], "values")
     name.delete(0, tk.END)
     name.insert(0, item_data[0])
     price.delete(0, tk.END)
     price.insert(0, item_data[1])
-
     add_button.config(state=tk.DISABLED)
     delete_button.config(state=tk.DISABLED)
     search_button.config(state=tk.DISABLED)
+    see_all_button.config(state=tk.DISABLED)
     edit_button.config(state=tk.NORMAL)
     start_edit_button.config(state=tk.DISABLED)
-
     global editing_item
     editing_item = selected_item[0]
-
 
 def save_edit():
     global editing_item
     new_name = name.get()
     new_price = price.get()
-
     if new_name and new_price and (
         bool(re.fullmatch(regex_product, new_name)) and bool(re.fullmatch(regex_price, new_price))):
-        tempfile = NamedTemporaryFile(mode="w", delete=False, newline="", encoding="utf-8")
-
-        with open("./products.csv", "r", encoding="utf-8") as csvfile, tempfile:
-            reader = csv.DictReader(csvfile)
-            writer = csv.DictWriter(tempfile, fieldnames=["nombre_producto", "precio"])
-            writer.writeheader()
-
-            for idx, row in enumerate(reader):
-                if str(idx) == editing_item:
-                    writer.writerow({"nombre_producto": new_name, "precio": new_price})
-                else:
-                    writer.writerow(row)
-
-        shutil.move(tempfile.name, "./products.csv")
+        producto_editado = Producto(new_name, new_price)
+        _update_product_in_csv(producto_editado, editing_item)
     else:
         messagebox.showwarning(
             "Advertencia", "Por favor ingrese nombre y precio del producto"
         )
         return
-
-
     name.delete(0, tk.END)
     price.delete(0, tk.END)
     add_button.config(state=tk.NORMAL)
     edit_button.config(state=tk.DISABLED)
     search_button.config(state=tk.NORMAL)
+    see_all_button.config(state=tk.NORMAL)
     start_edit_button.config(state=tk.NORMAL)
     editing_item = None
     get_products()
 
+def _update_product_in_csv(producto_actualizado, indice_a_editar):
+    tempfile = NamedTemporaryFile(mode="w", delete=False, newline="", encoding="utf-8")
+    with open("./products.csv", "r", encoding="utf-8") as csvfile, tempfile:
+        reader = csv.DictReader(csvfile)
+        writer = csv.DictWriter(tempfile, fieldnames=["nombre_producto", "precio"])
+        writer.writeheader()
+        for idx, row in enumerate(reader):
+            if str(idx) == indice_a_editar:
+                writer.writerow({"nombre_producto": producto_actualizado.nombre_producto, "precio": producto_actualizado.precio})
+            else:
+                writer.writerow(row)
+    shutil.move(tempfile.name, "./products.csv")
 
 init_csv()
 window = tk.Tk()
@@ -231,6 +232,9 @@ search_entry.pack(side=tk.LEFT, padx=5)
 search_button = tk.Button(search_frame, text="Buscar", command=search_products)
 search_button.pack(side=tk.LEFT, padx=5)
 
+see_all_button = tk.Button(search_frame, text="Mostrar todos", command=see_all_products)
+see_all_button.pack()
+
 delete_frame = tk.Frame(window, bg="#111")
 delete_frame.pack(pady=(0, 10))
 
@@ -259,13 +263,16 @@ style.configure("Treeview",
     foreground="#f8f8ff",
     fieldbackground="#333",
     bordercolor="#444",
-    borderwidth=1)
+    borderwidth=1,
+)
 
 style.configure("Treeview.Heading",
     background="#222",
     foreground="#f8f8ff",
     font=("Verdana", 10, "bold"),
-    relief="groove")
+    relief="groove"
+)
+
 
 def on_tree_select(event):
     selected = tree.selection()
@@ -275,7 +282,6 @@ def on_tree_select(event):
     else:
         delete_button.config(state=tk.DISABLED)
         start_edit_button.config(state=tk.DISABLED)
-
 
 tree.bind("<<TreeviewSelect>>", on_tree_select)
 
